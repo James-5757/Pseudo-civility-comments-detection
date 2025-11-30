@@ -109,3 +109,152 @@ gold_small.csv
 To balance the severely underrepresented `uncivil` class,  
 we augmented the gold set with **80 high-confidence uncivil sentences** from the weak dataset:
 gold_augmented.csv
+
+
+---
+
+## 📝 Annotation Guidelines (Final Version)
+
+### **1. Civil**
+A comment is labeled **civil** if:
+- It conveys disagreement politely  
+- It avoids attacking the interlocutor  
+- It uses reasoning rather than belittlement  
+
+**Examples**  
+- “I understand your point, but I disagree.”  
+- “Thank you for your explanation; I see it differently.”
+
+---
+
+### **2. Uncivil**
+A comment is **uncivil** if:
+- Contains profanity / insults  
+- Targets the interlocutor’s identity, intelligence, or intent  
+- Exhibits explicit hostility  
+
+**Examples**  
+- “You are an idiot.”  
+- “This is the dumbest thing I’ve ever read.”
+
+---
+
+### **3. Pseudo-Civil**
+A comment is **pseudo-civil** if:
+- Contains polite surface cues  
+- AND implicitly attacks competence / intelligence  
+- AND contains dismissive or belittling implications  
+
+**Examples**
+- “Thank you for your brilliant idea, though it makes absolutely no sense.”  
+- “With all due respect, no reasonable person would believe that.”
+
+This category requires pragmatic judgment.
+
+---
+
+## 🤖 Model Architecture
+
+We use **BERT-base-uncased** as a contextual embedding model.
+
+### **Two-stage training pipeline**
+
+#### **Stage 1 — Weak Supervision Training**
+- Train BERT on `train_weak_balanced.csv`
+- Learns coarse-grained distinctions (civil vs toxic)
+
+#### **Stage 2 — Gold Refinement**
+- Load `bert_weak_model`  
+- Fine-tune on `gold_augmented.csv`  
+- Use small learning rate `1e-5`  
+- 5 epochs  
+
+Purpose:
+> Correct biases created by weak labels  
+> and teach the model subtle pragmatic phenomena.
+
+---
+
+## 📊 Experimental Results
+### **1. Analyze Gold model**
+=== 最终评估结果（gold_small eval） ===
+- eval_loss: 0.6456559300422668
+- eval_macro_f1: 0.8291776838741032
+- eval_civil_f1: 0.851063829787234
+- eval_uncivil_f1: 0.9047619047619048
+- eval_pseudo_civil_f1: 0.7817073170731707
+- eval_accuracy: 0.8307692307692308
+- eval_runtime: 4.3529
+- eval_samples_per_second: 14.933
+- eval_steps_per_second: 1.149
+- epoch: 5.0
+
+### **2. Weak model vs Gold model performance (on the same gold evaluation set)**
+
+| Model | Macro F1 | Civil F1 | Uncivil F1 | Pseudo-Civil F1 | Accuracy |
+|-------|----------|----------|-------------|------------------|----------|
+| Weak Model | **0.51** | **0.00** | 0.88 | 0.67 | 0.625 |
+| Gold Model | **0.83** | 0.80 | 0.90 | 0.78 | **0.821** |
+
+### 🔍 Interpretation
+- Weak model **fails completely** on civil (F1 = 0)  
+  → It treats almost all polite comments as pseudo-civil or uncivil  
+- Gold model greatly improves civil detection (0 → 0.80)  
+- Pseudo-civil F1 increases from **0.67 → 0.78**  
+- Macro-F1 jumps from **0.51 → 0.83**
+
+## 🧭 Future Work
+
+### 1. **Larger annotated pseudo-civil dataset**
+- Multi-round annotation  
+- Clearer guidelines  
+- Better edge-case handling
+
+### 2. **Semi-supervised learning**
+- Self-training with model confidence  
+- Noise-robust loss functions (e.g., symmetric CE)
+
+### 3. **Sarcasm & irony modeling**
+- Integrate sarcasm detection models  
+- Use discourse act classification  
+- Capture pragmatic conflicts explicitly
+
+### 4. **Multilingual / cross-lingual transfer**
+- Apply XLM-R / mBERT  
+- Zero-shot pseudo-civil transfer to Chinese  
+- Collect polite-but-hostile multilingual corpora
+
+### 5. **Evaluation of robustness & calibration**
+- Temperature scaling  
+- Expected Calibration Error (ECE)  
+- Adversarial rewrite test (manual paraphrases)
+
+  ---
+
+## 📁 Repository Structure (Recommended)
+```bash
+.
+project/
+│
+├── data/
+│ ├── weak_labeled_dataset.csv
+│ ├── gold_small.csv
+│ ├── gold_augmented.csv
+│ ├── pseudo_civil_candidates.csv
+│ ├── pseudo_civil_filtered_for_manual.csv
+│
+├── models/
+│ ├── bert_weak_model/
+│ ├── bert_gold_model/
+│
+├── scripts/
+│ ├── prepare_datasets.py
+│ ├── build_candidates.py
+│ ├── filter_pseudo_civil.py
+│ ├── make_gold_augmented.py
+│ ├── train_bert_weak.py
+│ ├── train_bert_gold.py
+│ ├── compare_weak_vs_gold.py
+│
+├── README.md
+└── requirements.txt
